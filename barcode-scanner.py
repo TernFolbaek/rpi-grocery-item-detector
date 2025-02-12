@@ -1,7 +1,12 @@
 import cv2
 from pyzbar import pyzbar
 import requests
+import torch
+import threading
 
+
+
+# Function for fetching product info from Open Food Facts
 def fetch_product_info(barcode):
     url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
     try:
@@ -18,6 +23,8 @@ def fetch_product_info(barcode):
         print(f"Product not found for barcode: {barcode}")
         return None
 
+        
+# Main function to toggle between modes
 def main():
     cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
     if not cap.isOpened():
@@ -27,15 +34,20 @@ def main():
     # Optional: Set resolution (adjust as needed)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
+    model = torch.hub.load('ultralytics/yolov5', 'custom', path='yolov5/runs/train/exp9/weights/best.pt', force_reload=True)
     scanned_barcodes = set()
-    print("Scanning for barcodes. Press 'q' to quit.")
 
     while True:
         ret, frame = cap.read()
         if not ret:
             print("Failed to grab frame")
             break
+
+        # Run inference with YOLOv5
+        results = model(frame)
+
+        # Render results
+        annotated_frame = results.render()[0].copy()
 
         # Decode any barcodes in the frame
         barcodes = pyzbar.decode(frame)
@@ -47,7 +59,7 @@ def main():
             barcode_type = barcode.type
 
             text = f"{barcode_data} ({barcode_type})"
-            cv2.putText(frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(annotated_frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (0, 255, 0), 2)
 
             if barcode_data not in scanned_barcodes:
@@ -65,9 +77,9 @@ def main():
                 else:
                     print("No additional product info available.")
 
-        cv2.imshow("Barcode Scanner", frame)
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        cv2.imshow("Merged Detection", annotated_frame)
+        if cv2.waitKey(1) == ord('q'):
             break
 
     cap.release()
@@ -75,4 +87,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
