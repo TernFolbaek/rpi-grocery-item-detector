@@ -1,0 +1,6 @@
+train: ../YoloDataset/obj_train_data/images
+val: ../YoloDataset/obj_train_data/images
+
+nc: 8
+names: ['Milk carton', 'Jam', 'Alcohol', 'Toast', 'Yoghurt', 'Cucumber', 'Tomato', 'Anime beer']  
+
