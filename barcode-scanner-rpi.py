@@ -101,7 +101,7 @@ def main():
                     detected_object = True
                     detection_timer += 1  # Increment timer when an object is detected
                     if detection_timer >= 10:
-                        # send_telegram_message("Object detected with at least 40% confidence for 2 seconds.")
+                        send_telegram_message("Object detected with at least 40% confidence for 2 seconds.")
                         detection_timer = 0  # Reset the timer after sending the message
                     break
                 else:
