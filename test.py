@@ -4,8 +4,6 @@ import requests
 import torch
 from ultralytics import YOLO
 from picamera2 import Picamera2
-import time
-import numpy as np
 
 botToken = '7667739324:AAF5zhyajw13I2-ESDuWYLh9tTplWLVGzvY'
 messageToken = '7731233891'
@@ -40,26 +38,24 @@ def fetch_product_info(barcode):
         print(f"Product not found for barcode: {barcode}")
         return None
         
-
 def main():
-    # Initialize picamera2 instead of cv2.VideoCapture
+    # Initialize PiCamera2 instead of OpenCV's VideoCapture
     picam2 = Picamera2()
-    config = picam2.create_preview_configuration(main={"size": (640, 480)})
+    
+    # Configure camera with appropriate format for OpenCV processing
+    config = picam2.create_preview_configuration(main={"format": 'RGB888', "size": (640, 480)})
     picam2.configure(config)
     picam2.start()
     
-    # Give camera time to initialize
-    time.sleep(2)
-
-    model = YOLO('runs/detect/train2/weights/best.pt')  # YOLOv8 model loading
+    # Load YOLO model
+    model = YOLO('runs/detect/train2/weights/best.pt')
 
     scanned_barcodes = set()
-
     detection_timer = 0  # Timer to track the detection duration
     min_confidence = 0.4  # Minimum confidence threshold
 
     while True:
-        # Get frame from picamera2
+        # Capture frame from PiCamera2
         frame = picam2.capture_array()
         
         # Run inference with YOLOv8
@@ -89,7 +85,7 @@ def main():
         barcodes = pyzbar.decode(frame)
         for barcode in barcodes:
             (x, y, w, h) = barcode.rect
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             barcode_data = barcode.data.decode("utf-8")
             barcode_type = barcode.type
@@ -113,6 +109,7 @@ def main():
                 else:
                     print("No additional product info available.")
 
+        # Display the annotated frame
         cv2.imshow("Merged Detection", annotated_frame)
         if cv2.waitKey(1) == ord('q'):
             break
