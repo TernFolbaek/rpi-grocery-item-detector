@@ -2,7 +2,7 @@ import cv2
 from pyzbar import pyzbar
 import requests
 import torch
-from ultralytics import YOLO  # Import YOLOv8 from the ultralytics package
+from ultralytics import YOLO  
 
 botToken = '7667739324:AAF5zhyajw13I2-ESDuWYLh9tTplWLVGzvY'
 messageToken = '7731233891'
@@ -37,18 +37,16 @@ def fetch_product_info(barcode):
         print(f"Product not found for barcode: {barcode}")
         return None
         
-# Main function to toggle between modes
+
 def main():
     cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
     if not cap.isOpened():
         print("Could not open camera.")
         return
 
-    # Optional: Set resolution (adjust as needed)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-    # Load YOLOv8 model with weights located at the specified path
     model = YOLO('runs/detect/train2/weights/best.pt')  # YOLOv8 model loading
 
     scanned_barcodes = set()

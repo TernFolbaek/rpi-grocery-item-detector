@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "hailo_ai_sw_suite_2025-01_docker",
+			"path": "../../../Downloads/hailo_ai_sw_suite_2025-01_docker"
+		},
+		{
+			"name": "raspberry-fridge",
+			"path": "."
+		}
+	],
+	"settings": {}
+}
