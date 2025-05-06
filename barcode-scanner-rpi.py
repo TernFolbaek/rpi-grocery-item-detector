@@ -1,4 +1,7 @@
+from picamera2 import Picamera2
+from picamera2.outputs import FileOutput
 import cv2
+import numpy as np
 from pyzbar import pyzbar
 import requests
 import torch
@@ -40,72 +43,49 @@ def fetch_product_info(barcode):
         
 # Main function to toggle between modes
 def main():
-    # Open camera with V4L2 backend for Raspberry Pi
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-    
-    # Give camera time to initialize
-    time.sleep(2)
-    
-    if not cap.isOpened():
-        print("Could not open camera.")
+    print("Initializing camera...")
+    try:
+        # Initialize Picamera2
+        picam2 = Picamera2()
+        
+        # Configure camera with lower resolution for better performance
+        config = picam2.create_preview_configuration(
+            main={"size": (640, 480), "format": "RGB888"}
+        )
+        picam2.configure(config)
+        
+        # Start the camera
+        picam2.start()
+        print("Camera started successfully")
+        
+        # Add a small delay to let camera initialize
+        time.sleep(2)
+    except Exception as e:
+        print(f"Failed to initialize camera: {e}")
         return
-
-    # Set camera parameters for better performance
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FPS, 15)  # Lower FPS for better performance
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M','J','P','G'))  # Try MJPG format
 
     print("Loading YOLO model...")
     try:
-        # Load YOLOv8 model - specify device='cpu' for Raspberry Pi
+        # Load YOLOv8 model
         model = YOLO('best.pt', task='detect')
+        print("YOLO model loaded successfully")
     except Exception as e:
         print(f"Error loading YOLO model: {e}")
-        cap.release()
+        picam2.stop()
         return
-    print("YOLO model loaded successfully")
 
     scanned_barcodes = set()
     detection_timer = 0
     min_confidence = 0.4
-    
-    # Add retry logic
-    retry_count = 0
-    max_retries = 5
-
-    # Test camera with a single frame
-    ret, test_frame = cap.read()
-    if not ret:
-        print("Initial camera test failed. Trying to recover...")
-    else:
-        print(f"Initial camera test successful! Frame shape: {test_frame.shape}")
 
     print("Starting main detection loop...")
     while True:
-        # Read a frame from the camera
-        ret, frame = cap.read()
-        
-        # Handle failed frame reads
-        if not ret:
-            print(f"Failed to grab frame, retry {retry_count+1}/{max_retries}")
-            retry_count += 1
-            if retry_count >= max_retries:
-                print("Maximum retries reached, reopening camera")
-                cap.release()
-                time.sleep(1)
-                cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-                time.sleep(2)
-                retry_count = 0
-            time.sleep(0.5)
-            continue
-        
-        # Reset retry counter on success
-        retry_count = 0
-        
         try:
+            # Capture a frame using picamera2
+            frame = picam2.capture_array()
+            
             # Run inference with YOLOv8
-            results = model(frame, conf=0.4, iou=0.5, device='cpu')  # Specify CPU device
+            results = model(frame, conf=0.4, iou=0.5, device='cpu')
 
             # Annotate frame with the results
             annotated_frame = results[0].plot()
@@ -120,7 +100,7 @@ def main():
                 if conf >= min_confidence:
                     detected_object = True
                     detection_timer += 1  # Increment timer when an object is detected
-                    if detection_timer >= 10:  # Approximately 2 seconds at 5 FPS
+                    if detection_timer >= 10:
                         send_telegram_message("Object detected with at least 40% confidence for 2 seconds.")
                         detection_timer = 0  # Reset the timer after sending the message
                     break
@@ -168,8 +148,8 @@ def main():
             time.sleep(0.5)  # Short pause on error
 
     # Clean up resources
-    print("Releasing camera and closing windows...")
-    cap.release()
+    print("Stopping camera...")
+    picam2.stop()
     cv2.destroyAllWindows()
     print("Application terminated")
 
