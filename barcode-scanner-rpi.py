@@ -11,7 +11,7 @@ import time
 botToken = '7667739324:AAF5zhyajw13I2-ESDuWYLh9tTplWLVGzvY'
 messageToken = '7731233891'
 
-# Function to send message to Telegram bot
+
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{botToken}/sendMessage"
     params = {
@@ -24,7 +24,7 @@ def send_telegram_message(message):
     except requests.RequestException as e:
         print(f"Error sending message: {e}")
 
-# Function for fetching product info from Open Food Facts
+
 def fetch_product_info(barcode):
     url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
     try:

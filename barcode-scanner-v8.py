@@ -47,7 +47,7 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-    model = YOLO('runs/detect/train2/weights/best.pt')  # YOLOv8 model loading
+    model = YOLO('best.pt')  # YOLOv8 model loading
 
     scanned_barcodes = set()
 
