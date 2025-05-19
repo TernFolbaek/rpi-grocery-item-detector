@@ -3,9 +3,12 @@ from pyzbar import pyzbar
 import requests
 import torch
 from ultralytics import YOLO  
-
+import time
 botToken = '7667739324:AAF5zhyajw13I2-ESDuWYLh9tTplWLVGzvY'
 messageToken = '7731233891'
+
+DJANGO_SERVER_URL = "http://localhost:8000/api"
+
 
 # Function to send message to Telegram bot
 def send_telegram_message(message):
@@ -19,6 +22,21 @@ def send_telegram_message(message):
         response.raise_for_status()
     except requests.RequestException as e:
         print(f"Error sending message: {e}")
+
+def send_item_to_server(item_name):
+    endpoint = f"{DJANGO_SERVER_URL}/detect-item/"
+    data = {"name": item_name}
+
+    try:
+        response = requests.post(endpoint, json=data, timeout=5)
+        response.raise_for_status()
+        result = response.json()
+        print(f"Item '{item_name} saved to server. Current count{result['count']}")
+        return result
+    except requests.RequestException as e:
+        print(f"Error sending item to server: {e}")
+        return None
+    
 
 # Function for fetching product info from Open Food Facts
 def fetch_product_info(barcode):
@@ -50,9 +68,15 @@ def main():
     model = YOLO('best.pt')  # YOLOv8 model loading
 
     scanned_barcodes = set()
+    detected_classes = {}  # Dictionary to track detected classes and their frames count
 
     detection_timer = 0  # Timer to track the detection duration
     min_confidence = 0.4  # Minimum confidence threshold
+    min_detect_frames = 5 # Minimum frames before being confident enough
+
+    sent_items_cache = set()
+    resend_cooldown = 5
+    last_sent_time = {}
 
     while True:
         ret, frame = cap.read()
@@ -71,17 +95,36 @@ def main():
         for box in results[0].boxes:
             xyxy = box.xyxy.numpy()  # Get box coordinates (x1, y1, x2, y2)
             conf = box.conf.numpy()  # Get confidence score
-            cls = box.cls.numpy()  # Get class label
-
+            cls_idx = int(box.cls.numpy()[0])  # Get class index
+            cls_name = model.names[cls_idx] if hasattr(model,'names') else f"class_{cls_idx}"
             if conf >= min_confidence:
-                detected_object = True
-                detection_timer += 1  # Increment timer when an object is detected
-                if detection_timer >= 1 * 10:  # 2 seconds (assuming 30 FPS)
-                    send_telegram_message("Object detected with at least 40% confidence for 2 seconds.")
-                    detection_timer = 0  # Reset the timer after sending the message
-                break
+                if cls_name in detected_classes:
+                    detected_classes[cls_name] += 1
+                else:
+                    detected_classes[cls_name] = 1
+                
+                current_time = time.time()
+
+
+
+                # Send to server
+                server_result = send_item_to_server(cls_name)
+                if server_result:
+                    # Update last sent time
+                    last_sent_time[cls_name] = current_time
+
+                    # Send Telegram notif
+                    count = server_result.get('count', 1)
+                    send_telegram_message(f"Detected {cls_name} (total count: {count})")
+                
+                detected_classes[cls_name] = 0
+                
+                cv2.putText(annotated_frame, f"{cls_name} : {conf[0]:.2f}",
+                (int(xyxy[0][0]), int(xyxy[0][1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
             else:
-                detection_timer = 0  # Reset timer if confidence drops below threshold
+                if cls_name in detected_classes:
+                    detected_classes[cls_name] = 0
+
 
         # Decode any barcodes in the frame
         barcodes = pyzbar.decode(frame)
@@ -104,6 +147,7 @@ def main():
                 if product:
                     product_name = product.get("product_name", "Unknown")
                     print(f"Product Name: {product_name}")
+                    send_item_to_server(product_name)
                     ingredients = product.get("ingredients_text", "N/A")
                     nutriments = product.get("nutriments", {})
                     print("Ingredients:", ingredients)
